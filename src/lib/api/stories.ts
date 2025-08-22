@@ -183,7 +183,6 @@ export const getStoryWithContinuations = async (storyId: string) => {
       `)
       .eq("id", storyId)
       .single()
-    console.log("data", data)
     if (error) {
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }

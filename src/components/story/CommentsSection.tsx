@@ -11,6 +11,7 @@ import { useComments } from '@/lib/hooks/useComments'
 import { useAuth } from '@/lib/auth/context'
 import { cn } from '@/lib/utils'
 import type { Comment } from '@/types/database'
+import { eventBus } from '@/lib/hooks/eventbus'
 
 interface CommentsSectionProps {
   storyId: string
@@ -46,7 +47,24 @@ export function CommentsSection({ storyId, className }: CommentsSectionProps) {
   // Load comments on component mount
   useEffect(() => {
     loadComments()
+    const handleCommentUpdate = (payload: { story_id: string; commentId: string; type: 'add' | 'edit' | 'delete' }) => {
+      if (payload.story_id === storyId) {
+        loadComments(0)
+      }
+    }
+    const handleNewComment = async (payload: { story_id: string; commentId: string }) => {
+      await loadComments(0)
+    }
+    eventBus.on('commentUpdate', handleCommentUpdate)
+    eventBus.on('newComment', handleNewComment)
+    return () => {
+      eventBus.off('commentUpdate', handleCommentUpdate)
+      eventBus.off('newComment', handleNewComment)
+    }
   }, [storyId])
+
+
+
 
   const loadComments = async (pageNum: number = 0) => {
     const result = await fetchStoryComments(storyId, pageNum, 20)

@@ -14,8 +14,9 @@ import { ReadingHistory } from './ReadingHistory'
 import { VotingButtons } from './VotingButtons'
 import { CommentsSection } from './CommentsSection'
 import { useAuth } from '@/lib/auth/context'
-import { useRealtimeUpdates } from '@/lib/hooks/useRealtimeUpdates'
 import type { Story } from '@/types/database'
+import { eventBus } from '@/lib/hooks/eventbus'
+import { useRealtimeUpdates } from '@/lib/hooks/useRealtimeUpdates'
 
 interface StoryReaderProps {
   story: Story & {
@@ -42,6 +43,7 @@ interface StoryReaderProps {
 }
 
 export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
+  useRealtimeUpdates()
   const { user } = useAuth()
   const router = useRouter()
   const [showContinuationForm, setShowContinuationForm] = useState(false)
@@ -92,21 +94,17 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
     checkContribution()
   }, [user, currentStory.id])
 
-  // Real-time updates for votes and comments
-  useRealtimeUpdates({
-    onVoteUpdate: (payload) => {
-      console.log('Real-time vote update received:', payload)
+  useEffect(() => {
+    const handleVoteUpdate = (payload: { story_id: string; like_count: number; dislike_count: number }) => {
       if (payload.story_id === currentStory.id) {
-        console.log('Updating story vote counts:', payload)
         setCurrentStory(prev => ({
           ...prev,
           like_count: payload.like_count,
           dislike_count: payload.dislike_count
         }))
       }
-    },
-    onCommentUpdate: (payload) => {
-      console.log('Real-time comment update received:', payload)
+    }
+    const handleCommentCountUpdate = (payload: { story_id: string; comment_count: number }) => {
       if (payload.story_id === currentStory.id) {
         setCurrentStory(prev => ({
           ...prev,
@@ -114,7 +112,15 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
         }))
       }
     }
-  })
+    eventBus.on('voteUpdate', handleVoteUpdate)
+    eventBus.on('commentCountUpdate', handleCommentCountUpdate)
+    return () => {
+      eventBus.off('voteUpdate', handleVoteUpdate)
+      eventBus.off('commentCountUpdate', handleCommentCountUpdate)
+    }
+  }, [currentStory.id])
+
+
 
   const canContinue = !userContributionStatus.hasContributed && 
                      currentStory.continuation_count < currentStory.max_continuations &&

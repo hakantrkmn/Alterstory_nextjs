@@ -7,6 +7,7 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useVotes } from '@/lib/hooks/useVotes'
 import { useAuth } from '@/lib/auth/context'
 import { cn } from '@/lib/utils'
+import { eventBus } from '@/lib/hooks/eventbus'
 
 interface VotingButtonsProps {
   storyId: string
@@ -28,6 +29,21 @@ export function VotingButtons({
   const [dislikeCount, setDislikeCount] = useState(initialDislikeCount)
   const [userVote, setUserVote] = useState<'like' | 'dislike' | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Real-time vote count updates
+  useEffect(() => {
+    const handleVoteUpdate = (payload: { story_id: string; like_count: number; dislike_count: number }) => {
+      if (payload.story_id === storyId) {
+        setLikeCount(payload.like_count)
+        setDislikeCount(payload.dislike_count)
+      }
+    }
+    eventBus.on('voteUpdate', handleVoteUpdate)
+    return () => {
+      eventBus.off('voteUpdate', handleVoteUpdate)
+    }
+  }, [storyId])
+
 
   // Fetch user's current vote on component mount
   useEffect(() => {
@@ -58,11 +74,7 @@ export function VotingButtons({
         console.log('Remove vote result:', result)
         if (result.data) {
           setUserVote(null)
-          if (voteType === 'like') {
-            setLikeCount(prev => Math.max(0, prev - 1))
-          } else {
-            setDislikeCount(prev => Math.max(0, prev - 1))
-          }
+          // Real-time update will handle count changes automatically
         }
       } else {
         // If user voted differently or hasn't voted, update the vote
@@ -72,20 +84,7 @@ export function VotingButtons({
         if (result.data) {
           const previousVote = userVote
           setUserVote(voteType)
-          
-          // Update counts based on previous vote
-          if (previousVote === 'like') {
-            setLikeCount(prev => Math.max(0, prev - 1))
-          } else if (previousVote === 'dislike') {
-            setDislikeCount(prev => Math.max(0, prev - 1))
-          }
-          
-          // Add new vote
-          if (voteType === 'like') {
-            setLikeCount(prev => prev + 1)
-          } else {
-            setDislikeCount(prev => prev + 1)
-          }
+          // Real-time update will handle count changes automatically
         }
       }
     } catch (error) {
