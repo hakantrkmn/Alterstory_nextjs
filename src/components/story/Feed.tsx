@@ -47,9 +47,9 @@ export function Feed() {
   const loadStories = async (pageNum: number = 0, reset: boolean = false) => {
     try {
       setLoading(true)
-      
+      console.log("loading stories")
       const result = await getStoriesForFeed(pageNum, 20, sortBy)
-
+      console.log("result", result)
       if (result.error) {
         console.error('Failed to load stories:', result.error)
         return

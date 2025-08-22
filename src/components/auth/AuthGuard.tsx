@@ -2,7 +2,8 @@
 
 import { useAuth } from '@/lib/auth/context'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Loading } from '@/components/ui/loading'
 
 interface AuthGuardProps {
   children: React.ReactNode
@@ -17,31 +18,43 @@ export function AuthGuard({
 }: AuthGuardProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [shouldRedirect, setShouldRedirect] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user && redirectTo) {
-      router.push(redirectTo)
+    // Loading bittikten sonra auth kontrolü yap
+    if (!loading) {
+      if (!user && redirectTo) {
+        setShouldRedirect(true)
+        router.push(redirectTo)
+      }
     }
   }, [user, loading, router, redirectTo])
 
-  // 3 saniye sonra zorla loading'i false kabul et
-  // NOTE: Previously we forced a redirect after 3s if loading stayed true.
-  // That caused valid authenticated sessions to be redirected back to login
-  // if the auth client took longer to initialize. Remove the forced timeout
-  // and rely on the auth state from AuthProvider instead.
-
+  // Loading sırasında children'ı göster (sayfa geçişini engelleme)
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-        <p className="ml-4 text-muted-foreground">Yükleniyor...</p>
+      <>
+        {children}
+        {/* Overlay loading */}
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Loading size="lg" text="Kimlik doğrulanıyor..." />
+        </div>
+      </>
+    )
+  }
+
+  // Loading bitti, user yoksa ve redirect ediliyorsa loading göster
+  if (shouldRedirect) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Giriş yapılıyor...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user) {
-    return <>{fallback}</>
-  }
-
+  // User varsa children'ı göster
   return <>{children}</>
 }

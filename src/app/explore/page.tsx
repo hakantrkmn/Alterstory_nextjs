@@ -2,47 +2,34 @@
 
 import { useAuth } from '@/lib/auth/context'
 import { AuthGuard } from '@/components/auth/AuthGuard'
-import { Header } from '@/components/layout/Header'
+import { PageLayout, PageHeader, PageContent } from '@/components/layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { BookOpen, Users, TrendingUp, Clock, Plus } from 'lucide-react'
+import { Loading } from '@/components/ui/loading'
+import { BookOpen, Users, TrendingUp, Clock, Plus, Heart, MessageSquare } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useUserStats, useCommunityStats, usePopularStories } from '@/lib/hooks'
+import { formatDistanceToNow } from 'date-fns'
 
 export default function ExplorePage() {
   const { user, profile } = useAuth()
+  const router = useRouter()
+  const userStats = useUserStats()
+  const communityStats = useCommunityStats()
+  const popularStories = usePopularStories(5)
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          {/* Welcome Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  Hoş geldin, {profile?.display_name || 'Yazar'}! 👋
-                </h1>
-                <p className="text-muted-foreground">
-                  Hikayeler keşfet, yeni maceralar başlat veya devam ettir
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {profile?.display_name?.charAt(0).toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Yeni Hikaye
-                </Button>
-              </div>
-            </div>
-          </div>
+      <PageLayout maxWidth="xl" className="max-w-6xl">
+        <PageHeader
+          title={`Hoş geldin, ${profile?.display_name || 'Yazar'}! 👋`}
+          description="Hikayeler keşfet, yeni maceralar başlat veya devam ettir"
+        />
 
+        <PageContent>
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card>
@@ -50,8 +37,14 @@ export default function ExplorePage() {
                 <div className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-blue-500" />
                   <div>
-                    <p className="text-2xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">Oluşturduğun Hikayeler</p>
+                    {userStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">{userStats.createdStories}</p>
+                        <p className="text-sm text-muted-foreground">Oluşturduğun Hikayeler</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -62,8 +55,14 @@ export default function ExplorePage() {
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-green-500" />
                   <div>
-                    <p className="text-2xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">Katkıların</p>
+                    {userStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">{userStats.contributions}</p>
+                        <p className="text-sm text-muted-foreground">Katkıların</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -74,8 +73,14 @@ export default function ExplorePage() {
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-purple-500" />
                   <div>
-                    <p className="text-2xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">Aldığın Beğeniler</p>
+                    {userStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">{userStats.receivedLikes}</p>
+                        <p className="text-sm text-muted-foreground">Aldığın Beğeniler</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -86,8 +91,14 @@ export default function ExplorePage() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-orange-500" />
                   <div>
-                    <p className="text-2xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">Okuduğun Hikayeler</p>
+                    {userStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">{userStats.readStories}</p>
+                        <p className="text-sm text-muted-foreground">Okuduğun Hikayeler</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -109,14 +120,58 @@ export default function ExplorePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {/* Placeholder for stories */}
+                  {popularStories.isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loading size="lg" text="Hikayeler yükleniyor..." />
+                    </div>
+                  ) : popularStories.error ? (
+                    <div className="text-center py-8 text-red-600">
+                      <p>Hikayeler yüklenirken hata oluştu</p>
+                      <p className="text-sm">{popularStories.error}</p>
+                    </div>
+                  ) : popularStories.stories.length > 0 ? (
+                    <div className="space-y-4">
+                      {popularStories.stories.map((story) => (
+                        <Card key={story.id} className="p-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/story/${story.id}`)}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg mb-2 line-clamp-1">{story.title}</h3>
+                              <p className="text-gray-600 text-sm mb-3 line-clamp-2">{story.content}</p>
+                              <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <div className="flex items-center gap-1">
+                                  <Avatar className="h-4 w-4">
+                                    <AvatarImage src={story.profiles?.avatar_url} />
+                                    <AvatarFallback className="text-xs">
+                                      {story.profiles?.display_name?.charAt(0).toUpperCase() || 'U'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span>{story.profiles?.display_name || story.profiles?.username}</span>
+                                </div>
+                                <span>•</span>
+                                <span>{formatDistanceToNow(new Date(story.created_at), { addSuffix: true })}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-500">
+                              <div className="flex items-center gap-1">
+                                <Heart className="h-4 w-4" />
+                                <span>{story.like_count}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MessageSquare className="h-4 w-4" />
+                                <span>{story.continuation_count}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>Henüz hikaye bulunmuyor</p>
                       <p className="text-sm">İlk hikayeyi sen oluştur!</p>
                     </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -144,15 +199,25 @@ export default function ExplorePage() {
                   <CardTitle>Hızlı İşlemler</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full justify-start" variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Yeni Hikaye Başlat
+                  <Button asChild className="w-full justify-start" variant="outline">
+                    <Link href="/create">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Yeni Hikaye Başlat
+                    </Link>
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                    onClick={() => router.push('/feed')}
+                  >
                     <BookOpen className="h-4 w-4 mr-2" />
                     Rastgele Hikaye Oku
                   </Button>
-                  <Button className="w-full justify-start" variant="outline">
+                  <Button 
+                    className="w-full justify-start" 
+                    variant="outline"
+                    onClick={() => router.push('/search')}
+                  >
                     <Users className="h-4 w-4 mr-2" />
                     Yazarları Keşfet
                   </Button>
@@ -167,22 +232,34 @@ export default function ExplorePage() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Toplam Hikaye</span>
-                    <Badge variant="secondary">0</Badge>
+                    {communityStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <Badge variant="secondary">{communityStats.totalStories}</Badge>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Aktif Yazar</span>
-                    <Badge variant="secondary">0</Badge>
+                    {communityStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <Badge variant="secondary">{communityStats.activeWriters}</Badge>
+                    )}
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Bu Hafta Eklenen</span>
-                    <Badge variant="secondary">0</Badge>
+                    {communityStats.isLoading ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <Badge variant="secondary">{communityStats.weeklyAdded}</Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             </div>
           </div>
-        </div>
-      </div>
+        </PageContent>
+      </PageLayout>
     </AuthGuard>
   )
 }

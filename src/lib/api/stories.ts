@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/client'
 import type { 
   CreateStoryInput, 
@@ -152,15 +153,29 @@ export const getStoriesForFeed = async (
 // Get story with continuations
 export const getStoryWithContinuations = async (storyId: string) => {
   try {
+
+    // First, get the story without relations to check if it exists
+    const { data: story, error: storyError } = await supabase
+      .from("stories")
+      .select("*")
+      .eq("id", storyId)
+      .single()
+    if (storyError) {
+      if (storyError.code === 'PGRST116') {
+        return { data: null, error: { code: ErrorCodes.NOT_FOUND, message: "Story not found" } }
+      }
+      return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: storyError.message } }
+    }
+    if (!story) {
+      console.log("story not found")
+      return { data: null, error: { code: ErrorCodes.NOT_FOUND, message: "Story not found" } }
+    }
+    // Now get the full data with relations
     const { data, error } = await supabase
       .from("stories")
       .select(`
         *,
         profiles:author_id (username, display_name, avatar_url),
-        continuations:stories!parent_id (
-          *,
-          profiles:author_id (username, display_name, avatar_url)
-        ),
         comments (
           *,
           profiles:user_id (username, display_name, avatar_url)
@@ -168,16 +183,33 @@ export const getStoryWithContinuations = async (storyId: string) => {
       `)
       .eq("id", storyId)
       .single()
-
+    console.log("data", data)
     if (error) {
-      if (error.code === 'PGRST116') {
-        return { data: null, error: { code: ErrorCodes.NOT_FOUND, message: "Story not found" } }
-      }
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }
 
-    return { data, error: null }
-  } catch {
+    // Get continuations separately to avoid the foreign key issue
+    const { data: continuations, error: continuationsError } = await supabase
+      .from("stories")
+      .select(`
+        *,
+        profiles:author_id (username, display_name, avatar_url)
+      `)
+      .eq("parent_id", storyId)
+
+    if (continuationsError) {
+      console.error("Error fetching continuations:", continuationsError)
+    }
+
+    // Combine the data
+    const result = {
+      ...data,
+      continuations: continuations || []
+    }
+
+    return { data: result, error: null }
+  } catch (error) {
+    console.error("Error in getStoryWithContinuations:", error)
     return { 
       data: null, 
       error: { code: ErrorCodes.NETWORK_ERROR, message: "Failed to fetch story" } 
@@ -392,6 +424,7 @@ export const addContinuation = async (continuation: AddContinuationInput) => {
 // Get story tree structure
 export const getStoryTree = async (storyRootId: string) => {
   try {
+    console.log("storttree", storyRootId)
     const { data, error } = await supabase
       .from("stories")
       .select(`

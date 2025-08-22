@@ -1,8 +1,11 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { StoryReader } from '@/components/story/StoryReader'
+import { StoryBreadcrumb } from '@/components/navigation'
+import { PageLayout, PageContent } from '@/components/layout'
 import { getStoryWithContinuations, getStoryTree } from '@/lib/api/stories'
 import type { Story } from '@/types/database'
+import { AuthGuard } from '@/components/auth'
 
 interface StoryPageProps {
   params: Promise<{
@@ -13,6 +16,11 @@ interface StoryPageProps {
 export async function generateMetadata({ params }: StoryPageProps): Promise<Metadata> {
   try {
     const { id } = await params
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(id)) {
+      console.error('Invalid UUID format:', id)
+      notFound()
+    }
     const result = await getStoryWithContinuations(id)
     
     if (result.error || !result.data) {
@@ -91,9 +99,22 @@ export default async function StoryPage({ params }: StoryPageProps) {
     }
 
     return (
-      <div className="container mx-auto px-4 py-8">
-        <StoryReader story={result.data} breadcrumbs={breadcrumbs} />
-      </div>
+      <AuthGuard>
+      <PageLayout maxWidth="full" className="max-w-5xl" padding="sm">
+        <div className="mb-4 md:mb-6">
+          <StoryBreadcrumb
+            storyTitle={result.data.title}
+            storyId={result.data.story_root_id}
+            currentNodeTitle={result.data.level > 0 ? result.data.title : undefined}
+            currentNodeId={result.data.level > 0 ? result.data.id : undefined}
+          />
+        </div>
+        
+        <PageContent className="space-y-4 md:space-y-6">
+            <StoryReader story={result.data} breadcrumbs={breadcrumbs} />
+          </PageContent>
+        </PageLayout>
+      </AuthGuard>
     )
   } catch (error) {
     console.error('Error loading story:', error)

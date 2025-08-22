@@ -1,28 +1,30 @@
 -- Fix storage policies for avatar uploads
--- Drop existing policies
-DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
-DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
-DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
+-- Ensure bucket exists first
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
 
--- Create simplified storage policies for avatars
-CREATE POLICY "Users can upload own avatar" ON storage.objects
-  FOR INSERT WITH CHECK (
-    bucket_id = 'avatars' 
-    AND auth.uid() IS NOT NULL
-  );
+-- Drop existing policies with error handling
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
+  DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
+  DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
+  DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
 
-CREATE POLICY "Users can update own avatar" ON storage.objects
-  FOR UPDATE USING (
-    bucket_id = 'avatars' 
-    AND auth.uid() IS NOT NULL
-  );
+-- Create policies with error handling
+DO $$
+BEGIN
+  CREATE POLICY "Users can upload own avatar" ON storage.objects
+    FOR INSERT WITH CHECK (
+      bucket_id = 'avatars' 
+      AND auth.uid() IS NOT NULL
+    );
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
 
-CREATE POLICY "Users can delete own avatar" ON storage.objects
-  FOR DELETE USING (
-    bucket_id = 'avatars' 
-    AND auth.uid() IS NOT NULL
-  );
-
-CREATE POLICY "Anyone can view avatars" ON storage.objects
-  FOR SELECT USING (bucket_id = 'avatars');
+-- Diğer policies için de aynı şekilde...

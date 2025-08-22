@@ -150,7 +150,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-4 md:space-y-6">
       {/* Enhanced Navigation */}
       <StoryNavigation
         currentStory={currentStory}
@@ -162,21 +162,21 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="story">Story</TabsTrigger>
-          <TabsTrigger value="tree">Tree View</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-auto p-1">
+          <TabsTrigger value="story" className="text-xs sm:text-sm py-2">Story</TabsTrigger>
+          <TabsTrigger value="tree" className="text-xs sm:text-sm py-2">Tree View</TabsTrigger>
+          <TabsTrigger value="history" className="text-xs sm:text-sm py-2">History</TabsTrigger>
         </TabsList>
 
         {/* Story Tab */}
-        <TabsContent value="story" className="space-y-6">
+        <TabsContent value="story" className="space-y-4 md:space-y-6">
           {/* Main Story Card */}
           <Card>
             <CardHeader>
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-2xl mb-2">{currentStory.title}</CardTitle>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <CardTitle className="text-xl md:text-2xl mb-2">{currentStory.title}</CardTitle>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-6 w-6">
                         <AvatarImage src={currentStory.profiles.avatar_url} />
@@ -186,17 +186,19 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                       </Avatar>
                       <span>{currentStory.profiles.display_name}</span>
                     </div>
-                    <span>•</span>
-                    <span>{formatDate(currentStory.created_at)}</span>
-                    <span>•</span>
-                    <span>Level {currentStory.level}</span>
+                    <div className="flex items-center space-x-2 sm:space-x-4">
+                      <span className="hidden sm:inline">•</span>
+                      <span>{formatDate(currentStory.created_at)}</span>
+                      <span className="hidden sm:inline">•</span>
+                      <span>Level {currentStory.level}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="text-xs">
                     {currentStory.like_count} likes
                   </Badge>
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="text-xs">
                     {currentStory.dislike_count} dislikes
                   </Badge>
                 </div>
@@ -204,7 +206,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none mb-6">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-base md:text-lg">
                   {currentStory.content}
                 </p>
               </div>
@@ -219,14 +221,14 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
               </div>
 
               {/* Story Stats */}
-              <div className="flex items-center justify-between text-sm text-gray-500 border-t pt-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-sm text-gray-500 border-t pt-4">
                 <div className="flex items-center space-x-4">
                   <span>{currentStory.comment_count} comments</span>
                   <span>{currentStory.continuation_count} continuations</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   {userContributionStatus.hasContributed && (
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs">
                       {userContributionStatus.contributionType === 'create' 
                         ? 'You created this story' 
                         : 'You contributed to this story'
@@ -251,7 +253,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {currentStory.continuations!.map((continuation) => (
                     <Card 
                       key={continuation.id} 
@@ -259,13 +261,13 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                       onClick={() => router.push(`/story/${continuation.id}`)}
                     >
                       <CardContent className="p-4">
-                        <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                        <h3 className="font-semibold text-base md:text-lg mb-2 line-clamp-2">
                           {continuation.title}
                         </h3>
                         <p className="text-gray-600 text-sm mb-3 line-clamp-3">
                           {continuation.content}
                         </p>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500">
                           <div className="flex items-center space-x-2">
                             <Avatar className="h-5 w-5">
                               <AvatarImage src={continuation.profiles.avatar_url} />
@@ -311,11 +313,11 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                   onCancel={() => setShowContinuationForm(false)}
                 />
               ) : (
-                <div className="text-center py-8">
+                <div className="text-center py-6 md:py-8">
                   {!user ? (
                     <div>
                       <p className="text-gray-600 mb-4">You must be logged in to continue this story.</p>
-                      <Button onClick={() => router.push('/auth/login')}>
+                      <Button onClick={() => router.push('/auth/login')} className="w-full sm:w-auto">
                         Sign In to Continue
                       </Button>
                     </div>
@@ -327,7 +329,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                           : "You have already contributed to this story. Each user can only contribute once per story tree."
                         }
                       </p>
-                      <Button variant="outline" onClick={() => router.push('/feed')}>
+                      <Button variant="outline" onClick={() => router.push('/feed')} className="w-full sm:w-auto">
                         Explore Other Stories
                       </Button>
                     </div>
@@ -336,7 +338,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                       <p className="text-gray-600 mb-4">
                         This story has reached the maximum number of continuations ({currentStory.max_continuations}).
                       </p>
-                      <Button variant="outline" onClick={() => router.push('/feed')}>
+                      <Button variant="outline" onClick={() => router.push('/feed')} className="w-full sm:w-auto">
                         Explore Other Stories
                       </Button>
                     </div>
@@ -345,7 +347,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                       <p className="text-gray-600 mb-4">
                         Add your own continuation to this story. Keep it engaging and build upon the existing narrative.
                       </p>
-                      <Button onClick={() => setShowContinuationForm(true)}>
+                      <Button onClick={() => setShowContinuationForm(true)} className="w-full sm:w-auto">
                         Continue Story
                       </Button>
                     </div>
@@ -357,7 +359,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
         </TabsContent>
 
         {/* Tree View Tab */}
-        <TabsContent value="tree" className="space-y-6">
+        <TabsContent value="tree" className="space-y-4 md:space-y-6">
           <StoryTreeVisualization
             storyRootId={currentStory.story_root_id}
             currentStoryId={currentStory.id}
@@ -366,7 +368,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
         </TabsContent>
 
         {/* History Tab */}
-        <TabsContent value="history" className="space-y-6">
+        <TabsContent value="history" className="space-y-4 md:space-y-6">
           <ReadingHistory
             currentStoryId={currentStory.id}
             onStorySelect={handleStorySelect}
