@@ -43,11 +43,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Create trigger for new comments
 DROP TRIGGER IF EXISTS comment_notification_trigger ON public.comments;
-CREATE TRIGGER comment_notification_trigger
-  AFTER INSERT ON public.comments
-  FOR EACH ROW EXECUTE FUNCTION handle_comment_notification();
-
--- Function to create notification for mentions in comments
 CREATE OR REPLACE FUNCTION handle_comment_mentions()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -55,42 +50,47 @@ DECLARE
   commenter_name TEXT;
   story_title TEXT;
   mention_pattern TEXT;
+  mentioned_username TEXT;
 BEGIN
   -- Look for @username mentions in the comment
   mention_pattern := '@([a-zA-Z0-9_]+)';
   
   -- Find mentioned users and create notifications
-  FOR mentioned_user_id IN
-    SELECT p.id 
-    FROM public.profiles p
-    WHERE p.username = ANY(
-      SELECT regexp_matches(NEW.content, mention_pattern, 'g')
-    )
-    AND p.id != NEW.user_id  -- Don't notify self-mentions
+  FOR mentioned_username IN
+    SELECT (regexp_matches(NEW.content, mention_pattern, 'g'))[1]
   LOOP
-    -- Get commenter's display name
-    SELECT display_name INTO commenter_name
+    -- Get mentioned user ID
+    SELECT id INTO mentioned_user_id
     FROM public.profiles 
-    WHERE id = NEW.user_id;
+    WHERE username = mentioned_username
+    AND id != NEW.user_id;  -- Don't notify self-mentions
+    
+    -- If user found, create notification
+    IF mentioned_user_id IS NOT NULL THEN
+      -- Get commenter's display name
+      SELECT display_name INTO commenter_name
+      FROM public.profiles 
+      WHERE id = NEW.user_id;
 
-    -- Get story title
-    SELECT title INTO story_title
-    FROM public.stories 
-    WHERE id = NEW.story_id;
+      -- Get story title
+      SELECT title INTO story_title
+      FROM public.stories 
+      WHERE id = NEW.story_id;
 
-    -- Create mention notification
-    PERFORM create_notification(
-      mentioned_user_id,
-      'mention',
-      'You were mentioned in a comment',
-      commenter_name || ' mentioned you in a comment on "' || story_title || '"',
-      jsonb_build_object(
-        'story_id', NEW.story_id,
-        'comment_id', NEW.id,
-        'commenter_id', NEW.user_id,
-        'commenter_name', commenter_name
-      )
-    );
+      -- Create mention notification
+      PERFORM create_notification(
+        mentioned_user_id,
+        'mention',
+        'You were mentioned in a comment',
+        commenter_name || ' mentioned you in a comment on "' || story_title || '"',
+        jsonb_build_object(
+          'story_id', NEW.story_id,
+          'comment_id', NEW.id,
+          'commenter_id', NEW.user_id,
+          'commenter_name', commenter_name
+        )
+      );
+    END IF;
   END LOOP;
 
   RETURN NEW;

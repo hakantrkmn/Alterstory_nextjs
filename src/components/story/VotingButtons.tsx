@@ -34,7 +34,7 @@ export function VotingButtons({
     if (user) {
       fetchUserVote(storyId, user.id).then(result => {
         if (result.data) {
-          setUserVote(result.data.vote_type)
+          setUserVote(result.data)
         }
       })
     }
@@ -150,9 +150,14 @@ export function VotingButtons({
           "h-5 w-5",
           userVote === 'dislike' && "fill-current"
         )} />
-        <Badge variant={userVote === 'dislike' ? 'destructive' : 'outline'}>
-          {dislikeCount}
-        </Badge>
+        <Badge 
+  variant={userVote === 'dislike' ? 'outline' : 'outline'}
+  className={cn(
+    userVote === 'dislike' && "border-red-600 text-red-600 bg-red-50"
+  )}
+>
+  {dislikeCount}
+</Badge>
       </Button>
 
       {/* Loading indicator */}

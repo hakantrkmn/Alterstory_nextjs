@@ -119,7 +119,7 @@ export const removeVote = async (storyId: string, userId: string) => {
       .eq("story_id", storyId)
       .eq("user_id", userId)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error && error.code !== 'PGRST116') {
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
@@ -153,7 +153,7 @@ export const getUserVote = async (storyId: string, userId: string) => {
       .select("vote_type")
       .eq("story_id", storyId)
       .eq("user_id", userId)
-      .single()
+      .maybeSingle()
 
     if (error && error.code !== 'PGRST116') {
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
@@ -186,7 +186,7 @@ export const getStoryVoteStats = async (storyId: string) => {
       .from("stories")
       .select("like_count, dislike_count")
       .eq("id", storyId)
-      .single()
+      .maybeSingle()
 
     if (error) {
       if (error.code === 'PGRST116') {

@@ -31,14 +31,15 @@ export const addComment = async (comment: AddCommentInput) => {
     if (validationError) {
       return { data: null, error: validationError }
     }
-
+    console.log("comment", comment)
+    console.log("validationError", validationError)
     // Check if story exists
     const { data: storyExists } = await supabase
       .from("stories")
       .select("id")
       .eq("id", comment.storyId)
       .single()
-
+    console.log("storyExists", storyExists)
     if (!storyExists) {
       return { 
         data: null, 
@@ -48,6 +49,16 @@ export const addComment = async (comment: AddCommentInput) => {
         } 
       }
     }
+
+    // Debug: Authentication durumunu kontrol et
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('🔍 Debug - Current user:', user?.role)
+    console.log('🔍 Debug - Comment user_id:', comment.userId)
+    console.log('🔍 Debug - auth.uid() matches user_id:', user?.id === comment.userId)
+    
+    // Debug: Environment variables'ı kontrol et
+    console.log('🔍 Debug - NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('🔍 Debug - NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...')
 
     const { data, error } = await supabase
       .from("comments")
@@ -61,7 +72,7 @@ export const addComment = async (comment: AddCommentInput) => {
         profiles:user_id (username, display_name, avatar_url)
       `)
       .single()
-
+    console.log("data", data)
     if (error) {
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }
