@@ -151,6 +151,17 @@ export default function UserProfilePage() {
     }
   }, [activeTab, profile])
 
+  // Refresh voting history every 30 seconds if on activity tab
+  useEffect(() => {
+    if (activeTab === 'activity') {
+      const interval = setInterval(() => {
+        loadVotingHistory()
+      }, 30000) // 30 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [activeTab, profile])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -388,10 +399,22 @@ export default function UserProfilePage() {
               <TabsContent value="activity">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Recent Activity</CardTitle>
-                    <CardDescription>
-                      Recent likes and dislikes by {profile.display_name}
-                    </CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Recent Activity</CardTitle>
+                        <CardDescription>
+                          Recent likes and dislikes by {profile.display_name}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={loadVotingHistory}
+                        className="shrink-0"
+                      >
+                        Refresh
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {likedStories.length > 0 || dislikedStories.length > 0 ? (

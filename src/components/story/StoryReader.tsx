@@ -11,7 +11,10 @@ import { StoryContinuationForm } from './StoryContinuationForm'
 import { StoryNavigation } from './StoryNavigation'
 import { StoryTreeVisualization } from './StoryTreeVisualization'
 import { ReadingHistory } from './ReadingHistory'
+import { VotingButtons } from './VotingButtons'
+import { CommentsSection } from './CommentsSection'
 import { useAuth } from '@/lib/auth/context'
+import { useRealtimeUpdates } from '@/lib/hooks/useRealtimeUpdates'
 import type { Story } from '@/types/database'
 
 interface StoryReaderProps {
@@ -41,10 +44,11 @@ interface StoryReaderProps {
 export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
   const { user } = useAuth()
   const router = useRouter()
-    const [showContinuationForm, setShowContinuationForm] = useState(false)
+  const [showContinuationForm, setShowContinuationForm] = useState(false)
   const [activeTab, setActiveTab] = useState('story')
   const [showTreeView, setShowTreeView] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [currentStory, setCurrentStory] = useState(story)
   const [userContributionStatus, setUserContributionStatus] = useState<{
     hasContributed: boolean
     contributionType: 'create' | 'continue' | null
@@ -64,7 +68,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
       }
 
       try {
-        const response = await fetch(`/api/stories/${story.story_root_id}/contribution-status`)
+        const response = await fetch(`/api/stories/${currentStory.story_root_id}/contribution-status`)
         if (!response.ok) {
           throw new Error('Failed to check contribution status')
         }
@@ -86,10 +90,34 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
     }
 
     checkContribution()
-  }, [user, story.id])
+  }, [user, currentStory.id])
+
+  // Real-time updates for votes and comments
+  useRealtimeUpdates({
+    onVoteUpdate: (payload) => {
+      console.log('Real-time vote update received:', payload)
+      if (payload.story_id === currentStory.id) {
+        console.log('Updating story vote counts:', payload)
+        setCurrentStory(prev => ({
+          ...prev,
+          like_count: payload.like_count,
+          dislike_count: payload.dislike_count
+        }))
+      }
+    },
+    onCommentUpdate: (payload) => {
+      console.log('Real-time comment update received:', payload)
+      if (payload.story_id === currentStory.id) {
+        setCurrentStory(prev => ({
+          ...prev,
+          comment_count: payload.comment_count
+        }))
+      }
+    }
+  })
 
   const canContinue = !userContributionStatus.hasContributed && 
-                     story.continuation_count < story.max_continuations &&
+                     currentStory.continuation_count < currentStory.max_continuations &&
                      !userContributionStatus.isLoading
 
   const formatDate = (dateString: string) => {
@@ -125,7 +153,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Enhanced Navigation */}
       <StoryNavigation
-        currentStory={story}
+        currentStory={currentStory}
         breadcrumbs={breadcrumbs}
         onStorySelect={handleStorySelect}
         onShowTreeView={handleShowTreeView}
@@ -147,29 +175,29 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <CardTitle className="text-2xl mb-2">{story.title}</CardTitle>
+                  <CardTitle className="text-2xl mb-2">{currentStory.title}</CardTitle>
                   <div className="flex items-center space-x-4 text-sm text-gray-500">
                     <div className="flex items-center space-x-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={story.profiles.avatar_url} />
+                        <AvatarImage src={currentStory.profiles.avatar_url} />
                         <AvatarFallback>
-                          {story.profiles.display_name.charAt(0).toUpperCase()}
+                          {currentStory.profiles.display_name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span>{story.profiles.display_name}</span>
+                      <span>{currentStory.profiles.display_name}</span>
                     </div>
                     <span>•</span>
-                    <span>{formatDate(story.created_at)}</span>
+                    <span>{formatDate(currentStory.created_at)}</span>
                     <span>•</span>
-                    <span>Level {story.level}</span>
+                    <span>Level {currentStory.level}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge variant="outline">
-                    {story.like_count} likes
+                    {currentStory.like_count} likes
                   </Badge>
                   <Badge variant="outline">
-                    {story.dislike_count} dislikes
+                    {currentStory.dislike_count} dislikes
                   </Badge>
                 </div>
               </div>
@@ -177,15 +205,24 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
             <CardContent>
               <div className="prose max-w-none mb-6">
                 <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg">
-                  {story.content}
+                  {currentStory.content}
                 </p>
+              </div>
+
+              {/* Voting Buttons */}
+              <div className="mb-6">
+                <VotingButtons
+                  storyId={currentStory.id}
+                  initialLikeCount={currentStory.like_count}
+                  initialDislikeCount={currentStory.dislike_count}
+                />
               </div>
 
               {/* Story Stats */}
               <div className="flex items-center justify-between text-sm text-gray-500 border-t pt-4">
                 <div className="flex items-center space-x-4">
-                  <span>{story.comment_count} comments</span>
-                  <span>{story.continuation_count} continuations</span>
+                  <span>{currentStory.comment_count} comments</span>
+                  <span>{currentStory.continuation_count} continuations</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   {userContributionStatus.hasContributed && (
@@ -201,8 +238,11 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
             </CardContent>
           </Card>
 
+          {/* Comments Section */}
+          <CommentsSection storyId={currentStory.id} />
+
           {/* Continuations Section */}
-          {story.continuations && story.continuations.length > 0 && (
+          {currentStory.continuations && currentStory.continuations.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Continuations</CardTitle>
@@ -212,7 +252,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {story.continuations.map((continuation) => (
+                  {currentStory.continuations!.map((continuation) => (
                     <Card 
                       key={continuation.id} 
                       className="cursor-pointer hover:shadow-md transition-shadow"
@@ -266,7 +306,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                 </div>
               ) : showContinuationForm ? (
                 <StoryContinuationForm
-                  parentStory={story}
+                  parentStory={currentStory}
                   onSuccess={handleContinuationSuccess}
                   onCancel={() => setShowContinuationForm(false)}
                 />
@@ -291,10 +331,10 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
                         Explore Other Stories
                       </Button>
                     </div>
-                  ) : story.continuation_count >= story.max_continuations ? (
+                  ) : currentStory.continuation_count >= currentStory.max_continuations ? (
                     <div>
                       <p className="text-gray-600 mb-4">
-                        This story has reached the maximum number of continuations ({story.max_continuations}).
+                        This story has reached the maximum number of continuations ({currentStory.max_continuations}).
                       </p>
                       <Button variant="outline" onClick={() => router.push('/feed')}>
                         Explore Other Stories
@@ -319,8 +359,8 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
         {/* Tree View Tab */}
         <TabsContent value="tree" className="space-y-6">
           <StoryTreeVisualization
-            storyRootId={story.story_root_id}
-            currentStoryId={story.id}
+            storyRootId={currentStory.story_root_id}
+            currentStoryId={currentStory.id}
             onStorySelect={handleStorySelect}
           />
         </TabsContent>
@@ -328,7 +368,7 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
         {/* History Tab */}
         <TabsContent value="history" className="space-y-6">
           <ReadingHistory
-            currentStoryId={story.id}
+            currentStoryId={currentStory.id}
             onStorySelect={handleStorySelect}
           />
         </TabsContent>
