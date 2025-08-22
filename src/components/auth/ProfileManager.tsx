@@ -14,6 +14,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { getUserCreatedStories, getUserContributions, getUserStatistics } from '@/lib/api/users'
+import { getUserVotingHistory } from '@/lib/api/votes'
+import Link from 'next/link'
+import { formatDistanceToNow } from 'date-fns'
 
 const profileSchema = z.object({
   username: z
@@ -42,6 +46,33 @@ interface UserStats {
   totalEngagement: number
 }
 
+interface Story {
+  id: string
+  title: string
+  content: string
+  created_at: string
+  like_count: number
+  dislike_count: number
+  profiles?: {
+    username: string
+    display_name: string
+    avatar_url?: string
+  }
+}
+
+interface Contribution {
+  id: string
+  created_at: string
+  story: Story
+}
+
+interface Vote {
+  id: string
+  vote_type: 'like' | 'dislike'
+  created_at: string
+  stories: Story
+}
+
 export function ProfileManager() {
   const { user, profile, updateProfile } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
@@ -50,6 +81,14 @@ export function ProfileManager() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [createdStories, setCreatedStories] = useState<Story[]>([])
+  const [contributions, setContributions] = useState<Contribution[]>([])
+  const [likedStories, setLikedStories] = useState<Vote[]>([])
+  const [dislikedStories, setDislikedStories] = useState<Vote[]>([])
+  const [storiesLoading, setStoriesLoading] = useState(false)
+  const [contributionsLoading, setContributionsLoading] = useState(false)
+  const [votesLoading, setVotesLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('profile')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -83,59 +122,97 @@ export function ProfileManager() {
 
     setStatsLoading(true)
     try {
-      // Get stories created count
-      const { count: storiesCount } = await supabase
-        .from('stories')
-        .select('*', { count: 'exact', head: true })
-        .eq('author_id', user.id)
-        .is('parent_id', null)
-
-      // Get contributions count
-      const { count: contributionsCount } = await supabase
-        .from('story_contributions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('contribution_type', 'continue')
-
-      // Get likes received on user's stories
-      const { data: userStories } = await supabase
-        .from('stories')
-        .select('like_count')
-        .eq('author_id', user.id)
-
-      const likesReceived = userStories?.reduce((sum, story) => sum + story.like_count, 0) || 0
-
-      // Get votes given by user
-      const { count: likesGivenCount } = await supabase
-        .from('story_votes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('vote_type', 'like')
-
-      const { count: dislikesGivenCount } = await supabase
-        .from('story_votes')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('vote_type', 'dislike')
-
-      setStats({
-        storiesCreated: storiesCount || 0,
-        contributionsAdded: contributionsCount || 0,
-        likesReceived,
-        likesGiven: likesGivenCount || 0,
-        dislikesGiven: dislikesGivenCount || 0,
-        totalEngagement: (likesGivenCount || 0) + (dislikesGivenCount || 0) + likesReceived,
-      })
+      const { data: statsData } = await getUserStatistics(user.id)
+      
+      if (statsData) {
+        setStats({
+          storiesCreated: statsData.createdStories,
+          contributionsAdded: statsData.contributions,
+          likesReceived: statsData.totalLikesReceived,
+          likesGiven: 0, // Will be calculated from votes
+          dislikesGiven: 0, // Will be calculated from votes
+          totalEngagement: statsData.votes + statsData.comments + statsData.totalLikesReceived,
+        })
+      }
     } catch (error) {
       console.error('Error loading user stats:', error)
     } finally {
       setStatsLoading(false)
     }
-  }, [user, supabase])
+  }, [user])
+
+  const loadCreatedStories = useCallback(async () => {
+    if (!user) return
+
+    setStoriesLoading(true)
+    try {
+      const { data } = await getUserCreatedStories(user.id)
+      if (data) {
+        setCreatedStories(data)
+      }
+    } catch (error) {
+      console.error('Error loading created stories:', error)
+    } finally {
+      setStoriesLoading(false)
+    }
+  }, [user])
+
+  const loadContributions = useCallback(async () => {
+    if (!user) return
+
+    setContributionsLoading(true)
+    try {
+      const { data } = await getUserContributions(user.id)
+      if (data) {
+        setContributions(data)
+      }
+    } catch (error) {
+      console.error('Error loading contributions:', error)
+    } finally {
+      setContributionsLoading(false)
+    }
+  }, [user])
+
+  const loadVotingHistory = useCallback(async () => {
+    if (!user) return
+
+    setVotesLoading(true)
+    try {
+      const { data } = await getUserVotingHistory(user.id)
+      if (data) {
+        const liked = data.filter(vote => vote.vote_type === 'like')
+        const disliked = data.filter(vote => vote.vote_type === 'dislike')
+        setLikedStories(liked)
+        setDislikedStories(disliked)
+        
+        // Update stats with vote counts
+        setStats(prev => prev ? {
+          ...prev,
+          likesGiven: liked.length,
+          dislikesGiven: disliked.length,
+        } : null)
+      }
+    } catch (error) {
+      console.error('Error loading voting history:', error)
+    } finally {
+      setVotesLoading(false)
+    }
+  }, [user])
 
   React.useEffect(() => {
     loadUserStats()
   }, [user, loadUserStats])
+
+  // Load data when tab changes
+  React.useEffect(() => {
+    if (activeTab === 'created') {
+      loadCreatedStories()
+    } else if (activeTab === 'contributions') {
+      loadContributions()
+    } else if (activeTab === 'liked' || activeTab === 'disliked') {
+      loadVotingHistory()
+    }
+  }, [activeTab, loadCreatedStories, loadContributions, loadVotingHistory])
 
   const onSubmit = async (data: ProfileFormData) => {
     setIsLoading(true)
@@ -166,7 +243,7 @@ export function ProfileManager() {
     const file = event.target.files?.[0]
     if (!file || !user) return
     console.log('🔍 Debug - User:', user)
-    console.log('�� Debug - Session:', await supabase.auth.getSession())
+    console.log('🔍 Debug - Session:', await supabase.auth.getSession())
   
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -242,10 +319,14 @@ export function ProfileManager() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="stats">Statistics</TabsTrigger>
+          <TabsTrigger value="created">Created Stories</TabsTrigger>
+          <TabsTrigger value="contributions">Contributions</TabsTrigger>
+          <TabsTrigger value="liked">Liked Stories</TabsTrigger>
+          <TabsTrigger value="disliked">Disliked Stories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -407,6 +488,197 @@ export function ProfileManager() {
                 <p className="text-center text-gray-500">
                   Unable to load statistics
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="created">
+          <Card>
+            <CardHeader>
+              <CardTitle>Created Stories</CardTitle>
+              <CardDescription>
+                Stories you have started
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {storiesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : createdStories.length > 0 ? (
+                <div className="space-y-4">
+                  {createdStories.map((story) => (
+                    <Card key={story.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <Link href={`/story/${story.id}`} className="hover:underline">
+                            <h3 className="font-semibold text-lg">{story.title}</h3>
+                          </Link>
+                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                            {story.content}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>Created {formatDistanceToNow(new Date(story.created_at), { addSuffix: true })}</span>
+                            <span>👍 {story.like_count}</span>
+                            <span>👎 {story.dislike_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                                  <p className="text-center text-gray-500 py-8">
+                    You haven&apos;t created any stories yet.
+                    <br />
+                    <Link href="/create" className="text-blue-600 hover:underline">
+                      Start your first story
+                    </Link>
+                  </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="contributions">
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Contributions</CardTitle>
+              <CardDescription>
+                Stories you have continued
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {contributionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : contributions.length > 0 ? (
+                <div className="space-y-4">
+                  {contributions.map((contribution) => (
+                    <Card key={contribution.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <Link href={`/story/${contribution.story.id}`} className="hover:underline">
+                            <h3 className="font-semibold text-lg">{contribution.story.title}</h3>
+                          </Link>
+                          <p className="text-gray-600 text-sm mt-1">
+                            Original story by{' '}
+                            <span className="font-medium">
+                              {contribution.story.profiles?.display_name || contribution.story.profiles?.username}
+                            </span>
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>Contributed {formatDistanceToNow(new Date(contribution.created_at), { addSuffix: true })}</span>
+                            <span>👍 {contribution.story.like_count}</span>
+                            <span>👎 {contribution.story.dislike_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                                  <p className="text-center text-gray-500 py-8">
+                    You haven&apos;t contributed to any stories yet.
+                    <br />
+                    <Link href="/explore" className="text-blue-600 hover:underline">
+                      Explore stories to contribute
+                    </Link>
+                  </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="liked">
+          <Card>
+            <CardHeader>
+              <CardTitle>Liked Stories</CardTitle>
+              <CardDescription>
+                Stories you have liked
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {votesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : likedStories.length > 0 ? (
+                <div className="space-y-4">
+                  {likedStories.map((vote) => (
+                    <Card key={vote.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <Link href={`/story/${vote.stories.id}`} className="hover:underline">
+                            <h3 className="font-semibold text-lg">{vote.stories.title}</h3>
+                          </Link>
+                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                            {vote.stories.content}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>Liked {formatDistanceToNow(new Date(vote.created_at), { addSuffix: true })}</span>
+                            <span>👍 {vote.stories.like_count}</span>
+                            <span>👎 {vote.stories.dislike_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                                  <p className="text-center text-gray-500 py-8">
+                    You haven&apos;t liked any stories yet.
+                    <br />
+                    <Link href="/explore" className="text-blue-600 hover:underline">
+                      Explore stories to like
+                    </Link>
+                  </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="disliked">
+          <Card>
+            <CardHeader>
+              <CardTitle>Disliked Stories</CardTitle>
+              <CardDescription>
+                Stories you have disliked
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {votesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : dislikedStories.length > 0 ? (
+                <div className="space-y-4">
+                  {dislikedStories.map((vote) => (
+                    <Card key={vote.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <Link href={`/story/${vote.stories.id}`} className="hover:underline">
+                            <h3 className="font-semibold text-lg">{vote.stories.title}</h3>
+                          </Link>
+                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">
+                            {vote.stories.content}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            <span>Disliked {formatDistanceToNow(new Date(vote.created_at), { addSuffix: true })}</span>
+                            <span>👍 {vote.stories.like_count}</span>
+                            <span>👎 {vote.stories.dislike_count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                                  <p className="text-center text-gray-500 py-8">
+                    You haven&apos;t disliked any stories yet.
+                  </p>
               )}
             </CardContent>
           </Card>

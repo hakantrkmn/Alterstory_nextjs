@@ -18,22 +18,50 @@ export const getUserProfile = async (username: string) => {
       }
     }
 
-    const { data, error } = await supabase
+    // Get profile data
+    const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select(`
-        *,
-        created_stories:stories!author_id (count),
-        contributions:story_contributions (count),
-        received_likes:stories!author_id (like_count)
-      `)
+      .select("*")
       .eq("username", username)
       .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (profileError) {
+      if (profileError.code === 'PGRST116') {
         return { data: null, error: { code: ErrorCodes.NOT_FOUND, message: "User not found" } }
       }
-      return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
+      return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: profileError.message } }
+    }
+
+    // Get statistics separately
+    const [
+      { count: createdStoriesCount },
+      { count: contributionsCount },
+      { data: userStories }
+    ] = await Promise.all([
+      supabase
+        .from("stories")
+        .select("*", { count: "exact", head: true })
+        .eq("author_id", profileData.id)
+        .is("parent_id", null),
+      supabase
+        .from("story_contributions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profileData.id)
+        .eq("contribution_type", "continue"),
+      supabase
+        .from("stories")
+        .select("like_count")
+        .eq("author_id", profileData.id)
+    ])
+
+    const totalLikesReceived = userStories?.reduce((sum, story) => sum + (story.like_count || 0), 0) || 0
+
+    // Combine profile data with statistics
+    const data = {
+      ...profileData,
+      created_stories: createdStoriesCount || 0,
+      contributions: contributionsCount || 0,
+      received_likes: totalLikesReceived
     }
 
     return { data, error: null }
@@ -203,13 +231,9 @@ export const searchUsers = async (query: string, page: number = 0, limit: number
       }
     }
 
-    const { data, error } = await supabase
+    const { data: profiles, error } = await supabase
       .from("profiles")
-      .select(`
-        *,
-        created_stories:stories!author_id (count),
-        contributions:story_contributions (count)
-      `)
+      .select("*")
       .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
       .order("created_at", { ascending: false })
       .range(page * limit, (page + 1) * limit - 1)
@@ -218,7 +242,34 @@ export const searchUsers = async (query: string, page: number = 0, limit: number
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }
 
-    return { data, error: null }
+    // Get statistics for each user
+    const profilesWithStats = await Promise.all(
+      profiles.map(async (profile) => {
+        const [
+          { count: createdStoriesCount },
+          { count: contributionsCount }
+        ] = await Promise.all([
+          supabase
+            .from("stories")
+            .select("*", { count: "exact", head: true })
+            .eq("author_id", profile.id)
+            .is("parent_id", null),
+          supabase
+            .from("story_contributions")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", profile.id)
+            .eq("contribution_type", "continue")
+        ])
+
+        return {
+          ...profile,
+          created_stories: createdStoriesCount || 0,
+          contributions: contributionsCount || 0
+        }
+      })
+    )
+
+    return { data: profilesWithStats, error: null }
   } catch {
     return { 
       data: null, 
