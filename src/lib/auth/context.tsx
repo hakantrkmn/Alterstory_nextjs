@@ -60,47 +60,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase])
 
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('🔄 AuthProvider: Auth state changed:', event)
-    if (event === 'SIGNED_OUT') {
-      setProfile(null)
-      setUser(null)
-      setLoading(false)
-    }
-    if (event === 'SIGNED_IN') {
-      getInitialSession()
-    }
+  // Get initial session
+  const getInitialSession = useCallback(async () => {
+    try {
+      console.log('🔄 AuthProvider: Getting initial session...')
+      const { data: { user } } = await supabase.auth.getUser()
 
-  })
-  
-    // Get initial session
-    const getInitialSession =  useCallback(async () => {
-      try {
-        console.log('🔄 AuthProvider: Getting initial session...')
-        const { data: { user } } = await supabase.auth.getUser()
+      setUser(user ?? null)
 
-  
-
-        setUser(user ?? null)
-
-        if (user) {
-          console.log('👤 AuthProvider: User found, fetching profile...')
-          await fetchProfile(user.id)
-        }
-
-        console.log('✅ AuthProvider: Setting loading to false')
-        setLoading(false)
-      } catch (error) {
-        console.error('💥 AuthProvider: Error getting initial session:', error)
-    
+      if (user) {
+        console.log('👤 AuthProvider: User found, fetching profile...')
+        await fetchProfile(user.id)
       }
-    }, [supabase, fetchProfile])
 
+      console.log('✅ AuthProvider: Setting loading to false')
+      setLoading(false)
+    } catch (error) {
+      console.error('💥 AuthProvider: Error getting initial session:', error)
+    }
+  }, [supabase, fetchProfile])
 
-    useEffect(() => {
-      getInitialSession()
-      return
-    }, [getInitialSession])
+  // Set up auth state change listener
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 AuthProvider: Auth state changed:', event)
+      if (event === 'SIGNED_OUT') {
+        setProfile(null)
+        setUser(null)
+        setLoading(false)
+      }
+      if (event === 'SIGNED_IN') {
+        getInitialSession()
+      }
+    })
+
+    // Initial session check
+    getInitialSession()
+
+    // Cleanup subscription
+    return () => subscription.unsubscribe()
+  }, [getInitialSession])
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({

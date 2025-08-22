@@ -52,6 +52,7 @@ export function Header() {
           >
             Ara
           </Link>
+
         </nav>
 
         {/* User Menu */}

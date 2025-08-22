@@ -1,9 +1,11 @@
--- Create storage bucket for avatars (with duplicate key check)
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('avatars', 'avatars', true)
-ON CONFLICT (id) DO NOTHING;
+-- Fix storage policies for avatar uploads
+-- Drop existing policies
+DROP POLICY IF EXISTS "Users can upload own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own avatar" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view avatars" ON storage.objects;
 
--- Storage policies for avatars (simplified)
+-- Create simplified storage policies for avatars
 CREATE POLICY "Users can upload own avatar" ON storage.objects
   FOR INSERT WITH CHECK (
     bucket_id = 'avatars' 
