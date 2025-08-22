@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { BookOpen, User, LogOut, Settings } from 'lucide-react'
+import { BookOpen, User, LogOut, Settings, Search } from 'lucide-react'
 
 export function Header() {
   const { user, profile, signOut } = useAuth()
@@ -39,6 +39,13 @@ export function Header() {
             className="text-sm font-medium hover:text-primary transition-colors"
           >
             Feed
+          </Link>
+          <Link 
+            href="/search" 
+            className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+          >
+            <Search className="h-4 w-4" />
+            Arama
           </Link>
           <Link 
             href="/explore" 
