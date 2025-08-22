@@ -154,6 +154,16 @@ export const getStoryWithContinuations = async (storyId: string) => {
 // Create new story
 export const createStory = async (story: CreateStoryInput) => {
   try {
+    // Get current session to ensure authentication context
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return { 
+        data: null, 
+        error: { code: ErrorCodes.UNAUTHORIZED, message: "Not authenticated" }
+      }
+    }
+
     // Validate input
     const validationError = validateStoryInput(story)
     if (validationError) {
@@ -208,9 +218,10 @@ export const createStory = async (story: CreateStoryInput) => {
           title: story.title.trim(),
           content: story.content.trim(),
           author_id: story.authorId,
+          parent_id: story.parentId,
           story_root_id: story.storyRootId,
-          level: 0,
-          position: 0,
+          level: story.level || 0,
+          position: story.position || 0,
         })
         .select()
         .single()
@@ -248,6 +259,16 @@ export const createStory = async (story: CreateStoryInput) => {
 // Add continuation
 export const addContinuation = async (continuation: AddContinuationInput) => {
   try {
+    // Get current session to ensure authentication context
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return { 
+        data: null, 
+        error: { code: ErrorCodes.UNAUTHORIZED, message: "Not authenticated" }
+      }
+    }
+
     // Validate input
     const validationError = validateContinuationInput(continuation)
     if (validationError) {
@@ -335,6 +356,17 @@ export const addContinuation = async (continuation: AddContinuationInput) => {
 // Check if user has contributed to a story tree
 export const hasUserContributedToStory = async (userId: string, storyRootId: string) => {
   try {
+    // Get current session to ensure authentication context
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return { 
+        hasContributed: false, 
+        contributionType: null,
+        error: { code: ErrorCodes.UNAUTHORIZED, message: "Not authenticated" }
+      }
+    }
+
     const { data, error } = await supabase
       .from("story_contributions")
       .select("id, contribution_type")
@@ -342,7 +374,15 @@ export const hasUserContributedToStory = async (userId: string, storyRootId: str
       .eq("story_root_id", storyRootId)
       .single()
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No contribution found
+        return { 
+          hasContributed: false, 
+          contributionType: null,
+          error: null 
+        }
+      }
       return { hasContributed: false, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }
 
@@ -351,7 +391,8 @@ export const hasUserContributedToStory = async (userId: string, storyRootId: str
       contributionType: data?.contribution_type,
       error: null 
     }
-  } catch {
+  } catch (err) {
+    console.error('Error checking contribution status:', err)
     return { 
       hasContributed: false, 
       error: { code: ErrorCodes.NETWORK_ERROR, message: "Failed to check contribution status" } 

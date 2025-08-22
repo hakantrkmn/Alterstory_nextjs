@@ -61,6 +61,9 @@ export interface CreateStoryInput {
   content: string;
   authorId: string;
   storyRootId?: string;
+  parentId?: string;
+  level?: number;
+  position?: number;
 }
 
 export interface AddContinuationInput {
