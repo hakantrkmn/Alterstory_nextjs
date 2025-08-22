@@ -88,25 +88,59 @@ const validateContinuationInput = (input: AddContinuationInput): AppError | null
   return null
 }
 
-// Get stories for feed (with pagination)
-export const getStoriesForFeed = async (page: number = 0, limit: number = 20) => {
+// Sorting options for feed
+export type SortOption = 'newest' | 'most_liked' | 'most_active' | 'oldest'
+
+// Get stories for feed (with pagination and sorting)
+export const getStoriesForFeed = async (
+  page: number = 0, 
+  limit: number = 20, 
+  sortBy: SortOption = 'newest'
+) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("stories")
       .select(`
         *,
         profiles:author_id (username, display_name, avatar_url),
-        story_votes (vote_type)
+        story_votes (vote_type),
+        continuations:stories!parent_id (id)
       `)
       .is("parent_id", null) // Only root stories
-      .order("created_at", { ascending: false })
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'newest':
+        query = query.order("created_at", { ascending: false })
+        break
+      case 'oldest':
+        query = query.order("created_at", { ascending: true })
+        break
+      case 'most_liked':
+        query = query.order("like_count", { ascending: false })
+        break
+      case 'most_active':
+        // Order by number of continuations (most active stories)
+        query = query.order("continuation_count", { ascending: false })
+        break
+    }
+
+    const { data, error } = await query
       .range(page * limit, (page + 1) * limit - 1)
 
     if (error) {
       return { data: null, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
     }
 
-    return { data, error: null }
+    // Transform data to include computed fields
+    const transformedData = data?.map(story => ({
+      ...story,
+      continuation_count: story.continuations?.length || 0,
+      like_count: story.story_votes?.filter((vote: any) => vote.vote_type === 'like').length || 0,
+      dislike_count: story.story_votes?.filter((vote: any) => vote.vote_type === 'dislike').length || 0
+    }))
+
+    return { data: transformedData, error: null }
   } catch {
     return { 
       data: null, 

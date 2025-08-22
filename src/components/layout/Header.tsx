@@ -27,13 +27,19 @@ export function Header() {
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/explore" className="flex items-center gap-2 font-bold text-xl">
+        <Link href="/feed" className="flex items-center gap-2 font-bold text-xl">
           <BookOpen className="h-6 w-6 text-primary" />
           <span>HikayePlatform</span>
         </Link>
 
         {/* Navigation */}
         <nav className="hidden md:flex items-center gap-6">
+          <Link 
+            href="/feed" 
+            className="text-sm font-medium hover:text-primary transition-colors"
+          >
+            Feed
+          </Link>
           <Link 
             href="/explore" 
             className="text-sm font-medium hover:text-primary transition-colors"
@@ -46,13 +52,6 @@ export function Header() {
           >
             Oluştur
           </Link>
-          <Link 
-            href="/search" 
-            className="text-sm font-medium hover:text-primary transition-colors"
-          >
-            Ara
-          </Link>
-
         </nav>
 
         {/* User Menu */}
