@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { addContinuation, hasUserContributedToStory } from '@/lib/api/stories'
+
 import { useAuth } from '@/lib/auth/context'
 import type { Story } from '@/types/database'
 
@@ -47,11 +47,14 @@ export function StoryContinuationForm({ parentStory, onSuccess, onCancel }: Stor
       }
 
       try {
-        const result = await hasUserContributedToStory(user.id, parentStory.story_root_id)
+        const response = await fetch(`/api/stories/${parentStory.story_root_id}/contribution-status`)
+        if (!response.ok) {
+          throw new Error('Failed to check contribution status')
+        }
         
+        const result = await response.json()
         if (result.error) {
-          console.error('Error checking contribution:', result.error)
-          return
+          throw new Error(result.error.message)
         }
 
         setHasContributed(result.hasContributed)
@@ -85,17 +88,23 @@ export function StoryContinuationForm({ parentStory, onSuccess, onCancel }: Stor
     setError(null)
 
     try {
-      const result = await addContinuation({
-        title: title.trim(),
-        content: content.trim(),
-        authorId: user.id,
-        parentId: parentStory.id,
-        storyRootId: parentStory.story_root_id,
-        level: parentStory.level + 1
+      const response = await fetch(`/api/stories/${parentStory.story_root_id}/add-continuation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          content: content.trim(),
+          parentId: parentStory.id,
+          level: parentStory.level + 1
+        })
       })
 
-      if (result.error) {
-        setError(result.error.message)
+      const result = await response.json()
+
+      if (!response.ok) {
+        setError(result.error?.message || 'Failed to add continuation')
         return
       }
 

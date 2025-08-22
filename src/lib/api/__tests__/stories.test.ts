@@ -3,7 +3,6 @@ import {
   getStoriesForFeed, 
   createStory, 
   addContinuation,
-  hasUserContributedToStory,
   validateStoryInput,
   validateContinuationInput
 } from '../stories'
@@ -225,11 +224,5 @@ describe('Story API Functions', () => {
     })
   })
 
-  describe('hasUserContributedToStory', () => {
-    it('should check contribution status successfully', async () => {
-      const result = await hasUserContributedToStory('user-123', 'story-123')
-      expect(result.error).toBeNull()
-      expect(typeof result.hasContributed).toBe('boolean')
-    })
-  })
+
 })

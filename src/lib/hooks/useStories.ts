@@ -3,8 +3,6 @@ import {
   getStoriesForFeed, 
   getStoryWithContinuations, 
   createStory, 
-  addContinuation,
-  hasUserContributedToStory,
   getStoryTree,
   searchStories,
   type AppError
@@ -80,11 +78,27 @@ export const useStories = () => {
     setError(null)
     
     try {
-      const result = await addContinuation(continuationInput)
-      if (result.error) {
-        setError(result.error)
-        return { data: null, error: result.error }
+      const response = await fetch(`/api/stories/${continuationInput.storyRootId}/add-continuation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: continuationInput.title,
+          content: continuationInput.content,
+          parentId: continuationInput.parentId,
+          level: continuationInput.level
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        const error = { code: 'NETWORK_ERROR', message: result.error?.message || 'Failed to add continuation' }
+        setError(error)
+        return { data: null, error }
       }
+
       return { data: result.data, error: null }
     } catch {
       const error = { code: 'NETWORK_ERROR', message: 'Failed to add continuation' }
@@ -100,17 +114,22 @@ export const useStories = () => {
     setError(null)
     
     try {
-      const result = await hasUserContributedToStory(userId, storyRootId)
-      if (result.error) {
-        setError(result.error)
-        return { hasContributed: false, contributionType: null, error: result.error }
+      const response = await fetch(`/api/stories/${storyRootId}/contribution-status`)
+      if (!response.ok) {
+        throw new Error('Failed to check contribution status')
       }
+      
+      const result = await response.json()
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
+
       return { 
         hasContributed: result.hasContributed, 
         contributionType: result.contributionType,
         error: null 
       }
-    } catch {
+    } catch (err) {
       const error = { code: 'NETWORK_ERROR', message: 'Failed to check contribution status' }
       setError(error)
       return { hasContributed: false, contributionType: null, error }

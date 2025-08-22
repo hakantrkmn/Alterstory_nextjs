@@ -1,3 +1,6 @@
 export { StoryCreator } from './StoryCreator'
 export { StoryContinuationForm } from './StoryContinuationForm'
 export { StoryReader } from './StoryReader'
+export { StoryNavigation } from './StoryNavigation'
+export { StoryTreeVisualization } from './StoryTreeVisualization'
+export { ReadingHistory } from './ReadingHistory'

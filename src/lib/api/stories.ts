@@ -353,52 +353,7 @@ export const addContinuation = async (continuation: AddContinuationInput) => {
   }
 }
 
-// Check if user has contributed to a story tree
-export const hasUserContributedToStory = async (userId: string, storyRootId: string) => {
-  try {
-    // Get current session to ensure authentication context
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session) {
-      return { 
-        hasContributed: false, 
-        contributionType: null,
-        error: { code: ErrorCodes.UNAUTHORIZED, message: "Not authenticated" }
-      }
-    }
 
-    const { data, error } = await supabase
-      .from("story_contributions")
-      .select("id, contribution_type")
-      .eq("user_id", userId)
-      .eq("story_root_id", storyRootId)
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No contribution found
-        return { 
-          hasContributed: false, 
-          contributionType: null,
-          error: null 
-        }
-      }
-      return { hasContributed: false, error: { code: ErrorCodes.NETWORK_ERROR, message: error.message } }
-    }
-
-    return { 
-      hasContributed: !!data, 
-      contributionType: data?.contribution_type,
-      error: null 
-    }
-  } catch (err) {
-    console.error('Error checking contribution status:', err)
-    return { 
-      hasContributed: false, 
-      error: { code: ErrorCodes.NETWORK_ERROR, message: "Failed to check contribution status" } 
-    }
-  }
-}
 
 // Get story tree structure
 export const getStoryTree = async (storyRootId: string) => {

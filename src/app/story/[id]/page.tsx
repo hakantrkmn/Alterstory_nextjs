@@ -51,12 +51,30 @@ export default async function StoryPage({ params }: StoryPageProps) {
     }
 
     // Get breadcrumbs for navigation
-    let breadcrumbs: Story[] = []
+    let breadcrumbs: (Story & {
+      profiles: {
+        username: string
+        display_name: string
+        avatar_url?: string
+      }
+    })[] = []
     if (result.data.level > 0) {
       const treeResult = await getStoryTree(result.data.story_root_id)
       if (treeResult.data) {
         // Build breadcrumbs by traversing up the tree
-        const buildBreadcrumbs = (storyId: string, stories: Story[]): Story[] => {
+        const buildBreadcrumbs = (storyId: string, stories: (Story & {
+          profiles: {
+            username: string
+            display_name: string
+            avatar_url?: string
+          }
+        })[]): (Story & {
+          profiles: {
+            username: string
+            display_name: string
+            avatar_url?: string
+          }
+        })[] => {
           const story = stories.find(s => s.id === storyId)
           if (!story || story.level === 0) {
             return story ? [story] : []
