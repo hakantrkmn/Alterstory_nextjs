@@ -36,64 +36,64 @@ export function StoryCard({ story }: StoryCardProps) {
   const avatarInitials = displayName.split(' ').map(n => n[0]).join('').toUpperCase()
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={story.profiles.avatar_url} />
-              <AvatarFallback className="bg-primary/10 text-primary">
-                {avatarInitials}
-              </AvatarFallback>
-            </Avatar>
-                          <div>
-                <Link href={`/story/${story.id}`} className="hover:text-primary transition-colors">
-                  <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                    {story.title}
-                  </h3>
-                </Link>
+    <Link href={`/story/${story.id}`} className="block">
+      <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={story.profiles.avatar_url} />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  {avatarInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                  {story.title}
+                </h3>
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <User className="h-3 w-3" />
-                  <Link 
-                    href={`/profile/${story.profiles.username}`}
-                    className="hover:text-primary transition-colors"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {displayName}
-                  </Link>
+                    <span className="hover:text-primary transition-colors">
+                      {displayName}
+                    </span>
+
                   <span>•</span>
                   <Calendar className="h-3 w-3" />
                   <span>{timeAgo}</span>
                 </div>
               </div>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent className="pt-0">
-        <p className="text-muted-foreground mb-4 leading-relaxed">
-          {previewContent}
-        </p>
+        </CardHeader>
         
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-            <div className="flex items-center space-x-1">
-              <Heart className="h-4 w-4" />
-              <span>{story.like_count || 0}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <GitBranch className="h-4 w-4" />
-              <span>{story.continuation_count || 0} continuations</span>
-            </div>
-          </div>
+        <CardContent className="pt-0">
+          <p className="text-muted-foreground mb-4 leading-relaxed">
+            {previewContent}
+          </p>
           
-          <Link href={`/story/${story.id}`}>
-            <Button variant="outline" size="sm" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+              <div className="flex items-center space-x-1">
+                <Heart className="h-4 w-4" />
+                <span>{story.like_count || 0}</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <GitBranch className="h-4 w-4" />
+                <span>{story.continuation_count || 0} continuations</span>
+              </div>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
               Read Story
             </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

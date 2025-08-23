@@ -2,12 +2,10 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  console.log('🔧 Middleware: Processing request for:', request.nextUrl.pathname)
   
   let supabaseResponse = NextResponse.next({
     request,
   })
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -29,9 +27,19 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
-  const { data: { user }, error } = await supabase.auth.getUser()
-  return supabaseResponse
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (
+    !session &&
+    !request.nextUrl.pathname.startsWith('/auth') &&
+    !request.nextUrl.pathname.startsWith('/api/auth') &&
+    request.nextUrl.pathname !== '/'
+  ) {
+    // Session yok, login'e yönlendir
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
+  }
 }
 
 export const config = {

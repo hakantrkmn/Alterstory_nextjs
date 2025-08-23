@@ -1,9 +1,10 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { Database } from '@/types/database'
+import { useProfile, useUpdateProfile, useRefreshProfile } from '@/lib/hooks/useProfile'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
@@ -16,81 +17,55 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>
+  refreshUserProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  
   // Memoize Supabase client so it isn't recreated on every render
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
+  // React Query hooks
+  const { data: profile, isLoading: profileLoading, error: profileError } = useProfile(user?.id || null)
+  const updateProfileMutation = useUpdateProfile()
+  const { refreshProfile } = useRefreshProfile()
 
-  const fetchProfile = useCallback(async (userId: string) => {
-    try {
-
-      console.log('fetching profile for user:', userId)
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) {
-        console.error('❌ AuthProvider: Supabase error:', error)
-        console.error('❌ AuthProvider: Error code:', error.code)
-        console.error('❌ AuthProvider: Error message:', error.message)
-        console.error('❌ AuthProvider: Error details:', error.details)
-        return
-      }
-
-      if (!data) {
-        console.warn('⚠️ AuthProvider: No profile data returned')
-        return
-      }
-
-      console.log('✅ AuthProvider: Profile fetched successfully:', data)
-      setProfile(data)
-    } catch (error) {
-      console.error('💥 AuthProvider: Exception caught:', error)
-      console.error('💥 AuthProvider: Error stack:', error instanceof Error ? error.stack : 'No stack')
-    }
-  }, [supabase])
-
-  // Get initial session
+  // Get initial session - sadece user bilgisini al
   const getInitialSession = useCallback(async () => {
     try {
       console.log('🔄 AuthProvider: Getting initial session...')
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
 
-      setUser(user ?? null)
-
-      if (user) {
-        console.log('👤 AuthProvider: User found, fetching profile...')
-        await fetchProfile(user.id)
+      if (session?.user) {
+        setUser(session.user)
+        console.log('👤 AuthProvider: User found, profile will be fetched by React Query')
+      } else {
+        setUser(null)
       }
 
       console.log('✅ AuthProvider: Setting loading to false')
       setLoading(false)
     } catch (error) {
       console.error('💥 AuthProvider: Error getting initial session:', error)
+      setLoading(false)
     }
-  }, [supabase, fetchProfile])
+  }, [supabase])
 
   // Set up auth state change listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 AuthProvider: Auth state changed:', event)
+      
       if (event === 'SIGNED_OUT') {
-        setProfile(null)
         setUser(null)
         setLoading(false)
-      }
-      if (event === 'SIGNED_IN') {
-        getInitialSession()
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
+        setLoading(false)
       }
     })
 
@@ -108,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
     return { error }
   }
+
   const signUp = async (email: string, password: string, username: string, displayName: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -125,8 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   
     // Profile otomatik olarak trigger tarafından oluşturulacak
-    // Manuel olarak oluşturmaya gerek yok
-    console.log('�� AuthProvider: User created, profile will be created by trigger')
+    console.log('✅ AuthProvider: User created, profile will be created by trigger')
   
     return { error: null }
   }
@@ -150,27 +125,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: new Error('No user logged in') }
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-
-    if (!error) {
-      setProfile(prev => prev ? { ...prev, ...updates } : null)
+    try {
+      await updateProfileMutation.mutateAsync({ userId: user.id, updates })
+      return { error: null }
+    } catch (error) {
+      return { error: error as Error }
     }
-
-    return { error }
   }
+
+  const refreshUserProfile = async () => {
+    if (!user) return
+    
+    try {
+      await refreshProfile(user.id)
+    } catch (error) {
+      console.error('Failed to refresh profile:', error)
+    }
+  }
+
+  // Loading state - hem auth loading hem profile loading
+  const isLoading = Boolean(loading || (user && profileLoading))
 
   const value = {
     user,
-    profile,
-    loading,
+    profile: profile || null,
+    loading: isLoading,
     signIn,
     signUp,
     signInWithGoogle,
     signOut,
     updateProfile,
+    refreshUserProfile,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

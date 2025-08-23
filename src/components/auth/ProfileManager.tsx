@@ -18,6 +18,7 @@ import { getUserCreatedStories, getUserContributions, getUserStatistics } from '
 import { getUserVotingHistory } from '@/lib/api/votes'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
+import { useInvalidateProfile } from '@/lib/hooks/useProfile'
 
 const profileSchema = z.object({
   username: z
@@ -75,6 +76,7 @@ interface Vote {
 
 export function ProfileManager() {
   const { user, profile, updateProfile } = useAuth()
+  const { invalidateProfile } = useInvalidateProfile()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -231,6 +233,10 @@ export function ProfileManager() {
       } else {
         setSuccess('Profile updated successfully!')
         setTimeout(() => setSuccess(null), 3000)
+        // Cache'i invalidate et
+        if (user) {
+          invalidateProfile(user.id)
+        }
       }
     } catch {
       setError('An unexpected error occurred')
@@ -299,6 +305,10 @@ export function ProfileManager() {
       } else {
         setSuccess('Avatar updated successfully!')
         setTimeout(() => setSuccess(null), 3000)
+        // Cache'i invalidate et
+        if (user) {
+          invalidateProfile(user.id)
+        }
       }
     } catch {
       setError('Failed to upload avatar')

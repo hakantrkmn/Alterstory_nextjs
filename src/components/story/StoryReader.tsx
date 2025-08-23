@@ -246,8 +246,6 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
             </CardContent>
           </Card>
 
-          {/* Comments Section */}
-          <CommentsSection storyId={currentStory.id} />
 
           {/* Continuations Section */}
           {currentStory.continuations && currentStory.continuations.length > 0 && (
@@ -362,6 +360,9 @@ export function StoryReader({ story, breadcrumbs = [] }: StoryReaderProps) {
               )}
             </CardContent>
           </Card>
+                    {/* Comments Section */}
+                    <CommentsSection storyId={currentStory.id} />
+
         </TabsContent>
 
         {/* Tree View Tab */}

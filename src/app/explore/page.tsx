@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useAuth } from '@/lib/auth/context'
 import { AuthGuard } from '@/components/auth/AuthGuard'
 import { PageLayout, PageHeader, PageContent } from '@/components/layout'
@@ -15,11 +16,18 @@ import { useUserStats, useCommunityStats, usePopularStories } from '@/lib/hooks'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function ExplorePage() {
-  const { user, profile } = useAuth()
+  const { user, profile, refreshUserProfile } = useAuth()
   const router = useRouter()
   const userStats = useUserStats()
   const communityStats = useCommunityStats()
   const popularStories = usePopularStories(5)
+
+  // Sayfa açıldığında profile cache'ini yenile
+  useEffect(() => {
+    if (user) {
+      refreshUserProfile()
+    }
+  }, [user, refreshUserProfile])
 
   return (
     <AuthGuard>
